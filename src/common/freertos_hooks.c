@@ -1,4 +1,4 @@
-#include <stdlib.h>
+#include "hal.h"
 #include "FreeRTOS_DHCP.h"
 
 static const char hostname[] = "fomodon";
@@ -15,6 +15,6 @@ eDHCPCallbackAnswer_t xApplicationDHCPHook(eDHCPCallbackPhase_t /*phase*/, uint3
 
 BaseType_t xApplicationGetRandomNumber(uint32_t* rand_num_out)
 {
-    *rand_num_out = rand();
+    *rand_num_out = hal_rand();
     return pdTRUE;
 }

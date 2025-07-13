@@ -15,11 +15,11 @@ set(CMAKE_C_STANDARD 11)
 #Initialize Raspberry Pi Pico SDK
 pico_sdk_init()
 
-set(FREERTOS_CFG_DIRECTORY "config")
+set(CFG_DIRECTORY "config")
 set(FREERTOS_PLUS_TCP_NETWORK_IF "A_CUSTOM_NETWORK_IF" CACHE STRING "" FORCE)
 
 add_library(freertos_config INTERFACE)
-target_include_directories(freertos_config SYSTEM INTERFACE ${FREERTOS_CFG_DIRECTORY})
+target_include_directories(freertos_config SYSTEM INTERFACE ${CFG_DIRECTORY})
 target_link_libraries(freertos_config INTERFACE FreeRTOS-Kernel)
 
 #Set FreeRTOS port

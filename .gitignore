@@ -3,3 +3,4 @@
 [Bb]uild/
 [Gg]enerated/
 .*/
+config/SIPConfig.h
