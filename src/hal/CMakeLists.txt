@@ -12,12 +12,15 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(picoEnc28j60)
 
-add_library(freertos_plus_tcp_network_if STATIC)
-target_sources(freertos_plus_tcp_network_if PRIVATE RP2040/ENC28J60/NetworkInterface.c)
-target_link_libraries(freertos_plus_tcp_network_if PUBLIC pico_enc28j60_freertos_driver pico_stdlib_headers)
+if(NOT ${IS_TEST_BUILD})
+  add_library(freertos_plus_tcp_network_if STATIC)
+  target_sources(freertos_plus_tcp_network_if PRIVATE RP2040/ENC28J60/NetworkInterface.c)
+  target_link_libraries(freertos_plus_tcp_network_if PUBLIC pico_enc28j60_freertos_driver pico_stdlib_headers)
+endif()
+
 
 file(GLOB HAL_SOURCES "RP2040/hal.c")
-add_library(hal STATIC)
+add_library(hal STATIC EXCLUDE_FROM_ALL)
 target_sources(hal PRIVATE ${HAL_SOURCES})
 target_include_directories(hal PUBLIC "include")
-target_link_libraries(hal PUBLIC pico_stdlib pico_stdio_usb hardware_pio pico_enc28j60_freertos_driver_headers PRIVATE freertos_plus_tcp)
+target_link_libraries(hal PUBLIC pico_stdio_usb PRIVATE pico_stdlib_headers pico_rand hardware_pio pico_enc28j60_freertos_driver_headers freertos_plus_tcp)

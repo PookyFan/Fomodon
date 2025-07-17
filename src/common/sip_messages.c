@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <string.h>
 #include "hal.h"
 #include "SIPConfig.h"
@@ -5,6 +6,8 @@
 
 #define STRSIZE(s) sizeof(s)-1
 #define MSGPART(s) {s,STRSIZE(s)}
+#define VARMSGPART(s) {s,0}
+#define MSGPARTRAW(s) {s,sizeof(s)}
 
 #define RANDOM_STRING_SIZE 8
 #define CRLFPART MSGPART(crlf)
@@ -59,10 +62,10 @@ const char register_authorization_header[] = "Authorization: ";
 
 const message_part_t register_msg_parts[] = {
     MSGPART(register_request_line), CRLFPART,
-    MSGPART(register_from_header), MSGPART(register_identity_part), MSGPART(register_tag_part), MSGPART(sip_data.tag), CRLFPART,
-    MSGPART(register_to_header), MSGPART(register_to_header), CRLFPART,
-    MSGPART(register_call_id_header), MSGPART(sip_data.call_id), CRLFPART,
-    MSGPART(register_cseq_header), MSGPART(sip_data.cseq_str), CRLFPART,
+    MSGPART(register_from_header), MSGPART(register_identity_part), MSGPART(register_tag_part), MSGPARTRAW(sip_data.tag), CRLFPART,
+    MSGPART(register_to_header), MSGPART(register_identity_part), CRLFPART,
+    MSGPART(register_call_id_header), MSGPARTRAW(sip_data.call_id), CRLFPART,
+    MSGPART(register_cseq_header), VARMSGPART(sip_data.cseq_str), CRLFPART,
 
     //todo: non-mandatory headers like Contact and Accept
 
@@ -74,7 +77,7 @@ inline static bool auth_data_present()
     return NULL != sip_data.challenge_data.realm;
 }
 
-static void generate_random_tag(char tag_buf[RANDOM_STRING_SIZE])
+static void generate_random_tag(unsigned char tag_buf[RANDOM_STRING_SIZE])
 {
     uint32_t rand_high = hal_rand();
     uint32_t rand_low = hal_rand();
@@ -90,11 +93,13 @@ static void generate_random_tag(char tag_buf[RANDOM_STRING_SIZE])
     const char rand_first = '!';
     const char rand_max = 126 - rand_first + 1; //Add 1 since we're going to modulo divide by it
     unsigned int i;
-    for(i = 0; i < RANDOM_STRING_SIZE; ++i)
+    for(i = 1; i < RANDOM_STRING_SIZE - 1; ++i)
     {
-        char curr_char = (tag_buf[i] % rand_max) + rand_first;
+        unsigned char curr_char = (tag_buf[i] % rand_max) + rand_first;
         tag_buf[i] = (curr_char == '"') ? rand_first : curr_char; //We also don't want '"' as it marks tag's boundary
     }
+
+    tag_buf[0] = tag_buf[RANDOM_STRING_SIZE - 1] = '"';
 }
 
 //Assemble message from parts, and return total length of the assembled message
@@ -103,11 +108,15 @@ static int assemble_message(char* msg_buf, unsigned int buf_size, const message_
     int current_msg_size = 0;
     do
     {
+        const char* part_string = msg_parts_ptr->part_string;
         unsigned int size = msg_parts_ptr->part_size;
+        if(0 == size)
+            size = strlen(part_string);
+
         if((current_msg_size + size) > buf_size)
             return -current_msg_size;
 
-        memcpy(msg_buf + current_msg_size, msg_parts_ptr->part_string, size);
+        memcpy(msg_buf + current_msg_size, part_string, size);
         current_msg_size += size;
     } while (NULL != (++msg_parts_ptr)->part_string);
 
@@ -119,23 +128,35 @@ static int assemble_message(char* msg_buf, unsigned int buf_size, const message_
     return current_msg_size;
 }
 
+static void increment_cseq()
+{
+    snprintf(sip_data.cseq_str, sizeof(sip_data.cseq_str), "%u", ++sip_data.cseq_int);
+}
+
+void sip_initialize_context()
+{
+    memset(&sip_data, 0, sizeof(sip_data));
+    generate_random_tag(sip_data.call_id);
+    generate_random_tag(sip_data.tag);
+}
+
 int sip_prepare_register_request(char* msg_buf, unsigned int buf_size)
 {
+    increment_cseq();
     int header_size = assemble_message(msg_buf, buf_size, register_msg_parts);
-    if(header_size < 0)
+    if(header_size <= 0)
     {
         //todo: log it as error (or maybe one level above?)
         return header_size;
     }
 
-    int msg_end_mark_size = 2 * STRSIZE(crlf);
+    int msg_end_mark_size = sizeof(crlf);
     if((header_size + msg_end_mark_size) > buf_size)
     {
         //todo: log it as error (or maybe one level above?)
         return -(header_size + msg_end_mark_size);
     }
 
-    memcpy(msg_buf + header_size, crlf, STRSIZE(crlf));
-    memcpy(msg_buf + header_size  + STRSIZE(crlf), crlf, STRSIZE(crlf));
+    memcpy(msg_buf + header_size, crlf, msg_end_mark_size);
     return header_size + msg_end_mark_size;
 }
